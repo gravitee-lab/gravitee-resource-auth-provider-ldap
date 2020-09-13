@@ -18,6 +18,7 @@ package io.gravitee.resource.authprovider.ldap;
 import io.gravitee.gateway.api.handler.Handler;
 import io.gravitee.resource.authprovider.api.Authentication;
 import io.gravitee.resource.authprovider.api.AuthenticationProviderResource;
+import io.gravitee.resource.authprovider.ldap.cache.LRUCache;
 import io.gravitee.resource.authprovider.ldap.configuration.LdapAuthenticationProviderResourceConfiguration;
 import org.ldaptive.*;
 import org.ldaptive.auth.*;
@@ -27,6 +28,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -42,20 +45,42 @@ public class LdapAuthenticationProviderResource extends AuthenticationProviderRe
 
     private Authenticator authenticator;
 
+    private LRUCache cache;
+
+    private String [] userAttributes = ReturnAttributes.ALL_USER.value();
+
     @Override
     public void authenticate(String username, String password, Handler<Authentication> handler) {
-        try {
-            AuthenticationResponse response = authenticator.authenticate(new AuthenticationRequest(username, new Credential(password), ReturnAttributes.ALL_USER.value()));
-            if (response.getResult()) { // authentication succeeded
-                LdapEntry userEntry = response.getLdapEntry();
-                handler.handle(new Authentication(userEntry.getDn()));
-            } else { // authentication failed
-                logger.debug("Failed to authenticate user[{}] message[{}]", username, response.getMessage());
+        Authentication authentication = cache.get(username);
+
+        if (authentication == null) {
+            try {
+                AuthenticationResponse response = authenticator.authenticate(
+                        new AuthenticationRequest(username, new Credential(password), userAttributes));
+                if (response.getResult()) {
+                    LdapEntry userEntry = response.getLdapEntry();
+
+                    authentication = new Authentication(userEntry.getDn());
+
+                    Map<String, Object> attributes = userEntry.getAttributes().stream()
+                            .collect(Collectors.toMap(LdapAttribute::getName,
+                                    LdapAttribute::getStringValue));
+
+                    authentication.setAttributes(attributes);
+
+                    cache.put(username, authentication);
+
+                    handler.handle(authentication);
+                } else {
+                    logger.debug("Failed to authenticate user[{}] message[{}]", username, response.getMessage());
+                    handler.handle(null);
+                }
+            } catch (LdapException ldapEx) {
+                logger.error("An error occurs while trying to authenticate a user from LDAP [{}]", name(), ldapEx);
                 handler.handle(null);
             }
-        } catch (LdapException ldapEx) {
-            logger.error("An error occurs while trying to authenticate a user from LDAP [{}]", name(), ldapEx);
-            handler.handle(null);
+        } else {
+            handler.handle(authentication);
         }
     }
 
@@ -91,6 +116,14 @@ public class LdapAuthenticationProviderResource extends AuthenticationProviderRe
 
         authenticator = new Authenticator(dnResolver, authHandler);
         authenticator.setEntryResolver(pooledSearchEntryResolver);
+
+        cache = new LRUCache(configuration().getCacheMaxElements(),
+                Duration.ofMillis(configuration().getCacheTimeToLive()), Duration.ofMinutes(1));
+
+        if (configuration().getAttributes() != null && !configuration().getAttributes().isEmpty()) {
+            userAttributes = new String[configuration().getAttributes().size()];
+            userAttributes = configuration().getAttributes().toArray(userAttributes);
+        }
     }
 
     @Override
@@ -101,6 +134,17 @@ public class LdapAuthenticationProviderResource extends AuthenticationProviderRe
             logger.info("Closing LDAP connections to source[{}]", configuration().getContextSourceUrl());
             pooledConnectionFactory.getConnection().close();
             pooledConnectionFactory.getConnectionPool().close();
+        }
+
+        if (searchPooledConnectionFactory != null) {
+            logger.info("Closing LDAP search connections to source[{}]", configuration().getContextSourceUrl());
+            searchPooledConnectionFactory.getConnection().close();
+            searchPooledConnectionFactory.getConnectionPool().close();
+        }
+
+        if (cache != null) {
+            cache.clear();
+            cache.close();
         }
     }
 

@@ -39,6 +39,29 @@
       "title": "User search base",
       "description": "If user-search-base isn't supplied, the search will be performed from the root."
     },
+    "attributes" : {
+      "type" : "array",
+      "title": "User LDAP attributes to put in the request context. Attributes can then be read from any other policy supporting EL (gravitee.attribute.user.{attribute})",
+      "items" : {
+        "type" : "string",
+        "title": "Ldap attribute",
+        "description": "Name of the LDAP attribute"
+      }
+    },
+    "cacheMaxElements" : {
+      "type" : "integer",
+      "default": 100,
+      "minimum": 0,
+      "title": "Cache - Maximum number of elements",
+      "description": "Maximum number of elements within the cache used to store successful authentications."
+    },
+    "cacheTimeToLive" : {
+      "type" : "integer",
+      "default": 60000,
+      "minimum": 1000,
+      "title": "Cache - Time To Live",
+      "description": "Maximum time to live of the elements from the cache used to store successful authentications."
+    },
     "connectTimeout" : {
       "type" : "integer",
       "default": 5000,
@@ -73,6 +96,8 @@
     "contextSourceBase",
     "contextSourceUsername",
     "contextSourcePassword",
-    "userSearchFilter"
+    "userSearchFilter",
+    "cacheMaxElements",
+    "cacheTimeToLive"
   ]
 }
