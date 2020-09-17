@@ -17,6 +17,8 @@ package io.gravitee.resource.authprovider.ldap.configuration;
 
 import io.gravitee.resource.api.ResourceConfiguration;
 
+import java.util.List;
+
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
  * @author GraviteeSource Team
@@ -37,9 +39,15 @@ public class LdapAuthenticationProviderResourceConfiguration implements Resource
 
     private String userSearchFilter;
 
-    private Long connectTimeout = 5000l;
+    private List<String> attributes;
 
-    private Long responseTimeout = 5000l;
+    private int cacheMaxElements = 100;
+
+    private int cacheTimeToLive = 60000;
+
+    private Long connectTimeout = 5000L;
+
+    private Long responseTimeout = 5000L;
 
     private Integer minPoolSize = 5;
 
@@ -101,6 +109,14 @@ public class LdapAuthenticationProviderResourceConfiguration implements Resource
         this.userSearchFilter = userSearchFilter;
     }
 
+    public List<String> getAttributes() {
+        return attributes;
+    }
+
+    public void setAttributes(List<String> attributes) {
+        this.attributes = attributes;
+    }
+
     public Long getConnectTimeout() {
         return connectTimeout;
     }
@@ -131,5 +147,21 @@ public class LdapAuthenticationProviderResourceConfiguration implements Resource
 
     public void setMaxPoolSize(Integer maxPoolSize) {
         this.maxPoolSize = maxPoolSize;
+    }
+
+    public int getCacheMaxElements() {
+        return cacheMaxElements;
+    }
+
+    public void setCacheMaxElements(int cacheMaxElements) {
+        this.cacheMaxElements = cacheMaxElements;
+    }
+
+    public int getCacheTimeToLive() {
+        return cacheTimeToLive;
+    }
+
+    public void setCacheTimeToLive(int cacheTimeToLive) {
+        this.cacheTimeToLive = cacheTimeToLive;
     }
 }
